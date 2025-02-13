@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"auth-service/internal/entity"
+	"fmt"
 	"os"
 	"time"
 
@@ -10,8 +11,9 @@ import (
 
 var jwtSecret []byte
 
-func Init() {
-	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+func Init(JWTSecret string) {
+	jwtSecret = []byte(os.Getenv(JWTSecret))
+
 }
 
 func NewToken(user entity.User, duration time.Duration) (string, error) {
@@ -19,6 +21,7 @@ func NewToken(user entity.User, duration time.Duration) (string, error) {
 
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.ID
+	claims["username"] = user.Username
 	claims["email"] = user.Email
 	claims["exp"] = time.Now().Add(duration).Unix()
 
@@ -27,4 +30,14 @@ func NewToken(user entity.User, duration time.Duration) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+func ParseToken(tokenStr string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+	return token, err
 }
