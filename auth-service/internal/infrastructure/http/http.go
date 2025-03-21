@@ -4,6 +4,7 @@ import (
 	"auth-service/internal/entity"
 	"auth-service/internal/usecase"
 	"auth-service/pkg/jwt"
+	"auth-service/pkg/oauth2/github"
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"log/slog"
@@ -11,9 +12,10 @@ import (
 )
 
 type Handler struct {
-	usecase *usecase.UseCase
-	router  *mux.Router
-	log     *slog.Logger
+	usecase       *usecase.UseCase
+	githubService *github.Service
+	router        *mux.Router
+	log           *slog.Logger
 }
 
 type userDTO struct {

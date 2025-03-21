@@ -1,0 +1,62 @@
+  services:
+    db:
+      image: postgres:15
+      container_name: auth_db
+      restart: always
+      environment:
+        POSTGRES_USER: ${DB_USER}
+        POSTGRES_PASSWORD: ${DB_PASSWORD}
+        POSTGRES_DB: ${DB_NAME}
+      ports:
+        - "${DB_PORT}:5432"
+      healthcheck:
+        test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+      deploy:
+        resources:
+          limits:
+            memory: 512m
+            cpus: "0.5"
+      networks:
+        - backend
+
+    migrations:
+      image: gomicro/goose:3.24.1
+      depends_on:
+        db:
+          condition: service_healthy
+      volumes:
+        - ./migrations:/migrations
+      environment:
+        - DB_USER=${DB_USER}
+        - DB_PASSWORD=${DB_PASSWORD}
+        - DB_NAME=${DB_NAME}
+        - DB_HOST=${DB_HOST}
+        - DB_PORT=${DB_PORT}
+      command: >
+        sh -c "
+          while ! nc -z db 5432; do sleep 1; done;
+          goose postgres 'postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable' up;
+          sleep 2"
+      restart: on-failure
+      networks:
+        - backend
+
+    app:
+      build:
+        context: .
+        dockerfile: ./Dockerfile
+      container_name: auth_app
+      depends_on:
+        migrations:
+          condition: service_completed_successfully
+      ports:
+        - "${APP_PORT}:8080"
+      networks:
+        - backend
+
+  networks:
+    backend:
+      driver: bridge
