@@ -3,17 +3,19 @@ package usecase
 import (
 	"auth-service/internal/entity"
 	"auth-service/pkg/jwt"
-	"auth-service/pkg/oauth2/github"
+	oauth2Models "auth-service/pkg/oauth2"
+	"auth-service/pkg/oauth2/jwtUtils"
 	"context"
 )
 
 type Oauth2Storage interface {
-	UserByGithubID(context.Context, string, int64) (*entity.User, error)
-	SaveOauthConnection(context.Context, int64, *github.User) error
+	UserByProviderID(context.Context, string, string) (*entity.User, error)
+	SaveOauthConnection(context.Context, int64, *oauth2Models.User) error
 }
 
-func (uc *UseCase) AuthenticateOAuthUser(ctx context.Context, oauthUser *github.User) (string, error) {
-	existingUser, err := uc.oauthStorage.UserByGithubID(ctx, oauthUser.Provider, oauthUser.ID)
+func (uc *UseCase) AuthenticateOAuthUser(ctx context.Context, oauthUser *oauth2Models.User) (string, error) {
+
+	existingUser, err := uc.oauthStorage.UserByProviderID(ctx, oauthUser.Provider, string(oauthUser.ID))
 	if err != nil {
 		uc.log.ErrorContext(ctx, "failed to find OAuth user", "error", err)
 		return "", err
@@ -23,7 +25,7 @@ func (uc *UseCase) AuthenticateOAuthUser(ctx context.Context, oauthUser *github.
 		userID = existingUser.ID
 	} else {
 		//TODO: исправить логику создания oauth2 user без пароля
-		pass, err := github.GenerateState()
+		pass, err := jwtUtils.GenerateState()
 		if err != nil {
 			uc.log.ErrorContext(ctx, "failed to generate state", "error", err)
 			return "", err

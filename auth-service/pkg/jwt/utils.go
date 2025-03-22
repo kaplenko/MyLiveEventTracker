@@ -8,17 +8,24 @@ import (
 )
 
 func extractToken(r *http.Request) (string, error) {
+	// Пробуем получить токен из заголовка Authorization
 	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", fmt.Errorf("Missing Authorization header")
+	if authHeader != "" {
+		// Ожидаемый формат: "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 && parts[0] == "Bearer" {
+			return parts[1], nil
+		}
+		return "", fmt.Errorf("invalid Authorization header format")
 	}
 
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", fmt.Errorf("Invalid Authorization header format")
+	// Если токен не найден в заголовке, пробуем получить его из куки
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return "", fmt.Errorf("token not found in cookies or headers")
 	}
 
-	return parts[1], nil
+	return cookie.Value, nil
 }
 
 func validateToken(tokenStr string) (*jwt.Token, error) {

@@ -2,12 +2,12 @@ package storage
 
 import (
 	"auth-service/internal/entity"
-	"auth-service/pkg/oauth2/github"
+	oauth2Models "auth-service/pkg/oauth2"
 	"context"
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Storage) UserByGithubID(ctx context.Context, provider string, providerID int64) (*entity.User, error) {
+func (s *Storage) UserByProviderID(ctx context.Context, provider string, providerID string) (*entity.User, error) {
 	var user entity.User
 	query := `SELECT u.id, u.username, u.email
 			  FROM users u
@@ -23,7 +23,7 @@ func (s *Storage) UserByGithubID(ctx context.Context, provider string, providerI
 	return &user, nil
 }
 
-func (s *Storage) SaveOauthConnection(ctx context.Context, userID int64, user *github.User) error {
+func (s *Storage) SaveOauthConnection(ctx context.Context, userID int64, user *oauth2Models.User) error {
 	query := `INSERT INTO oauth_connections (user_id, provider, provider_id, access_token, refresh_token, expires_at)
 			  VALUES ($1, $2, $3, $4, $5, to_timestamp($6))
 			  ON CONFLICT (provider, provider_id) DO UPDATE

@@ -6,40 +6,41 @@ import (
 	"net/http"
 )
 
-func (h *Handler) GithubLoginRedirect(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GoogleLoginRedirect(w http.ResponseWriter, r *http.Request) {
 	state, err := jwtUtils.GenerateState()
 	if err != nil {
 		h.log.Error("Error generating state: ", err)
 	}
-	authURL := h.githubService.AuthURL(state)
-	http.Redirect(w, r, authURL, http.StatusFound)
+	authURL := h.googleService.AuthURL(state)
+	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) GithubCallback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Missing code", http.StatusBadRequest)
 		return
 	}
 	ctx := r.Context()
-	user, err := h.githubService.UserInfo(ctx, code)
+	user, err := h.googleService.UserInfo(ctx, code)
 	if err != nil {
 		h.log.Error("Error getting user info: ", err)
-		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
+		http.Error(w, "Failed getting user info", http.StatusInternalServerError)
 		return
 	}
+
 	token, err := h.useCase.AuthenticateOAuthUser(ctx, &oauth2Models.User{
-		ID:           string(user.ID),
+		ID:           user.ID,
 		Login:        user.Login,
 		Email:        user.Email,
-		Provider:     "github",
+		Provider:     "google",
 		AccessToken:  user.AccessToken,
 		RefreshToken: user.RefreshToken,
 		ExpiresAt:    user.ExpiresAt,
 	})
 	if err != nil {
-		h.log.Error("Error authenticating user", "error", err)
-		http.Error(w, "Authentication failed", http.StatusInternalServerError)
+		h.log.Error("Error authenticating user: ", err)
+		http.Error(w, "Failed authenticating user", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Authorization", "Bearer "+token)
@@ -49,5 +50,5 @@ func (h *Handler) GithubCallback(w http.ResponseWriter, r *http.Request) {
 		Value: token,
 		Path:  "/",
 	})
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }

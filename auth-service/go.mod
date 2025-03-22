@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 )

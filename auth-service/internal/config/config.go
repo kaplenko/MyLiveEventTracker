@@ -23,6 +23,10 @@ type Config struct {
 	GithubClientID     string `env:"GITHUB_CLIENT_ID" required:"true"`
 	GithubClientSecret string `env:"GITHUB_CLIENT_SECRET" required:"true"`
 	GithubRedirectURL  string `env:"GITHUB_REDIRECT_URL" required:"true"`
+
+	GoogleClientID     string `env:"GOOGLE_CLIENT_ID" required:"true"`
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET" required:"true"`
+	GoogleRedirectURL  string `env:"GOOGLE_REDIRECT_URL" required:"true"`
 }
 
 func LoadConfig() *Config {

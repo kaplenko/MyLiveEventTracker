@@ -10,7 +10,7 @@ CREATE TABLE oauth_connections
 (
     user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
     provider oauth_provider NOT NULL,
-    provider_id BIGINT NOT NULL,
+    provider_id TEXT NOT NULL,
     access_token TEXT,
     refresh_token TEXT,
     expires_at TIMESTAMP,

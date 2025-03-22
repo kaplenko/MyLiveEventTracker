@@ -5,6 +5,7 @@ import (
 	"auth-service/internal/config"
 	"auth-service/pkg/jwt"
 	"auth-service/pkg/oauth2/github"
+	"auth-service/pkg/oauth2/google"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,16 +22,15 @@ func main() {
 	)
 
 	githhub := github.NewGithubService(cfg.GithubClientID, cfg.GithubClientSecret, cfg.GithubRedirectURL, log)
+	google := google.NewGoogleService(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL, log)
 
 	log.Info("Starting server")
 
 	fmt.Println(cfg.GithubClientID)
-	log.Info("GithubClientSecret: %V", cfg.GithubClientSecret)
-	log.Info("GithubRedirectURL: %V", cfg.GithubRedirectURL)
 
 	jwt.Init(cfg.JWTSecret)
 
-	app := app.New(log, DBDSN, cfg.TokenTTL, githhub)
+	app := app.New(log, DBDSN, cfg.TokenTTL, githhub, google)
 
 	app.Run(cfg.AppHost, cfg.AppPort)
 }
