@@ -5,6 +5,7 @@ import (
 	"auth-service/internal/usecase"
 	"auth-service/pkg/jwt"
 	"auth-service/pkg/oauth2/github"
+	"auth-service/pkg/oauth2/google"
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"log/slog"
@@ -12,8 +13,9 @@ import (
 )
 
 type Handler struct {
-	usecase       *usecase.UseCase
+	useCase       *usecase.UseCase
 	githubService *github.Service
+	googleService *google.Service
 	router        *mux.Router
 	log           *slog.Logger
 }
@@ -25,10 +27,11 @@ type userDTO struct {
 	Password string `json:"password"`
 }
 
-func New(usecase *usecase.UseCase, gh *github.Service, r *mux.Router, log *slog.Logger) *Handler {
+func New(useCase *usecase.UseCase, gh *github.Service, google *google.Service, r *mux.Router, log *slog.Logger) *Handler {
 	return &Handler{
-		usecase:       usecase,
+		useCase:       useCase,
 		githubService: gh,
+		googleService: google,
 		router:        r,
 		log:           log,
 	}
@@ -39,65 +42,129 @@ func (h *Handler) Router() *mux.Router {
 }
 
 func (h *Handler) SetupRoutes() {
+	h.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("pkg/static"))))
+
+	h.router.HandleFunc("/login", h.LoginPage).Methods("GET")
+	h.router.HandleFunc("/register", h.RegisterPage).Methods("GET")
+	h.router.Handle("/", jwt.JWTMiddleware(http.HandlerFunc(h.HomePage))).Methods("GET")
+
+	h.router.Handle("/profile", jwt.JWTMiddleware(http.HandlerFunc(h.Profile))).Methods("GET")
+
 	h.router.HandleFunc("/register", h.Register).Methods("POST")
 	h.router.HandleFunc("/login", h.Login).Methods("POST")
-	h.router.Handle("/profile", jwt.JWTMiddleware(http.HandlerFunc(h.Profile))).Methods("GET")
+
 	h.router.HandleFunc("/auth/github", h.GithubLoginRedirect).Methods("GET")
 	h.router.HandleFunc("/auth/github/callback", h.GithubCallback).Methods("GET")
+
+	h.router.HandleFunc("/auth/google", h.GoogleLoginRedirect).Methods("GET")
+	h.router.HandleFunc("/auth/google/callback", h.GoogleCallback).Methods("GET")
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var req userDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
+	// Парсим данные из формы
+	name := r.FormValue("_name")
+	email := r.FormValue("_email")
+	password := r.FormValue("_password")
+
+	// Создаем объект пользователя
 	user := entity.User{
-		ID:       req.ID,
-		Username: req.Username,
-		Email:    req.Email,
-		PassHash: []byte(req.Password),
+		Username: name,
+		Email:    email,
+		PassHash: []byte(password), // Пароль нужно хэшировать перед сохранением в БД
 	}
 
-	id, err := h.usecase.Registre(r.Context(), user)
+	// Регистрируем пользователя через useCase
+	_, err := h.useCase.Registre(r.Context(), user)
 	if err != nil {
+		// Если ошибка, показываем страницу регистрации с сообщением об ошибке
+		data := struct {
+			Title   string
+			Message string
+			Error   string
+		}{
+			Title:   "Register",
+			Message: "",
+			Error:   "Registration failed: " + err.Error(),
+		}
+
+		templates, err := h.loadTemplates()
+		if err != nil {
+			h.log.Error("Failed to load templates", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		err = templates.ExecuteTemplate(w, "register.html", data)
+		if err != nil {
+			h.log.Error("Failed to render template", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	// Если регистрация успешна, показываем сообщение об успехе
+	data := struct {
+		Title   string
+		Message string
+		Error   string
+	}{
+		Title:   "Register",
+		Message: "Registration successful! Please login.",
+		Error:   "",
+	}
+
+	templates, err := h.loadTemplates()
+	if err != nil {
+		h.log.Error("Failed to load templates", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	response := map[string]int64{"id": id}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.log.Error(err.Error())
+	err = templates.ExecuteTemplate(w, "register.html", data)
+	if err != nil {
+		h.log.Error("Failed to render template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	var req *userDTO
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
+	email := r.FormValue("_email")
+	password := r.FormValue("_password")
 
-	token, err := h.usecase.Login(r.Context(), req.Email, []byte(req.Password))
+	token, err := h.useCase.Login(r.Context(), email, []byte(password))
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		data := struct {
+			Title string
+			Error string
+		}{
+			Title: "Login",
+			Error: "Invalid email or password",
+		}
+
+		templates, err := h.loadTemplates()
+		if err != nil {
+			h.log.Error("Failed to load templates", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		err = templates.ExecuteTemplate(w, "login.html", data)
+		if err != nil {
+			h.log.Error("Failed to render template", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 
-	h.log.Info("User logged in")
-
-	response := map[string]string{"token": token}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.log.Error(err.Error())
-		return
-	}
+	http.SetCookie(w, &http.Cookie{
+		Name:  "token",
+		Value: token,
+		Path:  "/",
+	})
+	http.Redirect(w, r, "/home", http.StatusFound)
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +175,7 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.usecase.GetUser(r.Context(), userID)
+	user, err := h.useCase.GetUser(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return

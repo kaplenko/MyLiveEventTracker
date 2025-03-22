@@ -1,8 +1,6 @@
 package github
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -18,7 +16,6 @@ type Service struct {
 type User struct {
 	ID           int64  `json:"id"`
 	Login        string `json:"login"`
-	Name         string `json:"name"`
 	Email        string `json:"email"`
 	Provider     string `json:"provider"`
 	AccessToken  string `json:"accessToken"`
@@ -77,12 +74,4 @@ func (g *Service) UserInfo(ctx context.Context, code string) (*User, error) {
 
 	g.log.Info("Successfully fetched user info: %s", user.Login)
 	return &user, nil
-}
-
-func GenerateState() (string, error) {
-	state := make([]byte, 32)
-	if _, err := rand.Read(state); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(state), nil
 }
