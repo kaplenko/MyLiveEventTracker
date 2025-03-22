@@ -21,7 +21,7 @@ func New(connStr string) (*Storage, error) {
 	return &Storage{pool: pool}, nil
 }
 
-func (s Storage) SaveUser(ctx context.Context, user entity.User, passwordHash []byte) (int64, error) {
+func (s *Storage) SaveUser(ctx context.Context, user entity.User, passwordHash []byte) (int64, error) {
 	query := `INSERT INTO users (username, email, pass_hash) 
 			  VALUES ($1, $2, $3) 
 			  RETURNING id`
@@ -32,7 +32,7 @@ func (s Storage) SaveUser(ctx context.Context, user entity.User, passwordHash []
 	return userId, nil
 }
 
-func (s Storage) GetUserByID(ctx context.Context, id int64) (entity.User, error) {
+func (s *Storage) GetUserByID(ctx context.Context, id int64) (entity.User, error) {
 	query := `SELECT id, username, email, pass_hash 
 			  FROM users 
 			  WHERE id = $1`
@@ -48,7 +48,7 @@ func (s Storage) GetUserByID(ctx context.Context, id int64) (entity.User, error)
 	return user, nil
 }
 
-func (s Storage) GetUserByEmail(ctx context.Context, email string) (entity.User, error) {
+func (s *Storage) GetUserByEmail(ctx context.Context, email string) (entity.User, error) {
 	query := `SELECT id, username, email, pass_hash
 			  FROM users
 			  WHERE email = $1`

@@ -19,6 +19,10 @@ type Config struct {
 
 	AppHost string `env:"APP_HOST" required:"true"`
 	AppPort string `env:"APP_PORT" required:"true"`
+
+	GithubClientID     string `env:"GITHUB_CLIENT_ID" required:"true"`
+	GithubClientSecret string `env:"GITHUB_CLIENT_SECRET" required:"true"`
+	GithubRedirectURL  string `env:"GITHUB_REDIRECT_URL" required:"true"`
 }
 
 func LoadConfig() *Config {

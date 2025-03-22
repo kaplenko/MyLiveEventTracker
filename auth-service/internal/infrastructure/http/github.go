@@ -2,8 +2,7 @@ package http
 
 import (
 	"auth-service/pkg/oauth2/github"
-	"errors"
-	"github.com/jackc/pgx/v5"
+	"fmt"
 	"net/http"
 )
 
@@ -22,18 +21,28 @@ func (h *Handler) GithubCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing code", http.StatusBadRequest)
 		return
 	}
-	user, err := h.githubService.UserInfo(r.Context(), code)
+	ctx := r.Context()
+	user, err := h.githubService.UserInfo(ctx, code)
 	if err != nil {
 		h.log.Error("Error getting user info: ", err)
-	}
-
-	existingUser, err := h.usecase.GetUser(r.Context(), user.ID)
-	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "Failed to query the database", http.StatusInternalServerError)
+		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
 		return
 	}
-
-	if existingUser != nil {
-
+	token, err := h.usecase.AuthenticateOAuthUser(ctx, &github.User{
+		ID:           user.ID,
+		Login:        user.Name,
+		Name:         user.Name,
+		Email:        user.Email,
+		Provider:     "github",
+		AccessToken:  user.AccessToken,
+		RefreshToken: user.RefreshToken,
+		ExpiresAt:    user.ExpiresAt,
+	})
+	if err != nil {
+		h.log.Error("Error authenticating user", "error", err)
+		http.Error(w, "Authentication failed", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Authorization", "Bearer "+token)
+	w.Write([]byte(fmt.Sprintf("Welcome, %s!", user.Name)))
 }

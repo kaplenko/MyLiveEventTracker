@@ -25,11 +25,12 @@ type userDTO struct {
 	Password string `json:"password"`
 }
 
-func New(usecase *usecase.UseCase, r *mux.Router, log *slog.Logger) *Handler {
+func New(usecase *usecase.UseCase, gh *github.Service, r *mux.Router, log *slog.Logger) *Handler {
 	return &Handler{
-		usecase: usecase,
-		router:  r,
-		log:     log,
+		usecase:       usecase,
+		githubService: gh,
+		router:        r,
+		log:           log,
 	}
 }
 
@@ -41,6 +42,8 @@ func (h *Handler) SetupRoutes() {
 	h.router.HandleFunc("/register", h.Register).Methods("POST")
 	h.router.HandleFunc("/login", h.Login).Methods("POST")
 	h.router.Handle("/profile", jwt.JWTMiddleware(http.HandlerFunc(h.Profile))).Methods("GET")
+	h.router.HandleFunc("/auth/github", h.GithubLoginRedirect).Methods("GET")
+	h.router.HandleFunc("/auth/github/callback", h.GithubCallback).Methods("GET")
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,7 @@ import (
 	httpApp "auth-service/internal/infrastructure/http"
 	"auth-service/internal/infrastructure/storage"
 	"auth-service/internal/usecase"
+	"auth-service/pkg/oauth2/github"
 	"github.com/gorilla/mux"
 	"log/slog"
 	"net/http"
@@ -14,16 +15,16 @@ type App struct {
 	httpApp *httpApp.Handler
 }
 
-func New(log *slog.Logger, connStr string, tokenTTL time.Duration) *App {
-	storage, err := storage.New(connStr)
+func New(log *slog.Logger, connStr string, tokenTTL time.Duration, gh *github.Service) *App {
+	strg, err := storage.New(connStr)
 	if err != nil {
 		panic(err)
 	}
-	authService := usecase.New(storage, storage, log, tokenTTL)
+	authService := usecase.New(strg, strg, strg, log, tokenTTL)
 
 	r := mux.NewRouter()
 
-	httpApp := httpApp.New(authService, r, log)
+	httpApp := httpApp.New(authService, gh, r, log)
 
 	return &App{
 		httpApp: httpApp,

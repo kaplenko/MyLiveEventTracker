@@ -13,22 +13,24 @@ type UserSaver interface {
 	SaveUser(ctx context.Context, user entity.User, passwordHash []byte) (int64, error)
 }
 
-type UseProvider interface {
+type UserProvider interface {
 	GetUserByID(ctx context.Context, id int64) (entity.User, error)
 	GetUserByEmail(ctx context.Context, email string) (entity.User, error)
 }
 
 type UseCase struct {
 	userSaver    UserSaver
-	userProvider UseProvider
+	userProvider UserProvider
+	oauthStorage Oauth2Storage
 	log          *slog.Logger
 	tokenTTL     time.Duration
 }
 
-func New(us UserSaver, up UseProvider, log *slog.Logger, tokenTTL time.Duration) *UseCase {
+func New(us UserSaver, up UserProvider, os Oauth2Storage, log *slog.Logger, tokenTTL time.Duration) *UseCase {
 	return &UseCase{
 		userSaver:    us,
 		userProvider: up,
+		oauthStorage: os,
 		log:          log,
 		tokenTTL:     tokenTTL,
 	}
